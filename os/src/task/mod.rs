@@ -45,6 +45,8 @@ pub struct TaskManagerInner {
     tasks: [TaskControlBlock; MAX_APP_NUM],
     /// id of current `Running` task
     current_task: usize,
+    /// syscall count of each task
+    syscall_count: [[usize; 512]; MAX_APP_NUM],
 }
 
 lazy_static! {
@@ -65,6 +67,7 @@ lazy_static! {
                 UPSafeCell::new(TaskManagerInner {
                     tasks,
                     current_task: 0,
+                    syscall_count: [[0; 512]; MAX_APP_NUM],
                 })
             },
         }
@@ -72,6 +75,27 @@ lazy_static! {
 }
 
 impl TaskManager {
+    /// Get the current task id
+    pub fn get_current_task_id(&self) -> usize {
+        let inner = self.inner.exclusive_access();
+        inner.current_task
+    }
+
+    /// add the syscall which id is _id 's count of current task
+    pub fn add_syscall_count(&self, _id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current_task = inner.current_task;
+        inner.syscall_count[current_task][_id] += 1; // 增加调用次数
+        drop(inner);
+    }
+
+    /// Get the syscall count of current task
+    pub fn get_syscall_count(&self, _id: usize) -> isize {
+        let inner = self.inner.exclusive_access();
+        let current_task = inner.current_task;
+        inner.syscall_count[current_task][_id] as isize
+    }
+
     /// Run the first task in task list.
     ///
     /// Generally, the first task in task list is an idle task (we call it zero process later).
